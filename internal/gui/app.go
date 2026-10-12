@@ -179,14 +179,19 @@ func (a *App) showBusyFilesRetryDialog(onDone func()) {
 	msgLabel := widget.NewLabel("解密目录中有文件正在被其他程序占用，无法执行写回。\n请关闭占用文件的程序后点击「重试」。")
 	msgLabel.Wrapping = fyne.TextWrapWord
 
+	var d dialog.Dialog
+
 	retryBtn := widget.NewButtonWithIcon("重试", theme.ViewRefreshIcon(), func() {
 		logger.Info("用户选择重试写回")
+		d.Hide()
 		a.tryAutoWriteback(onDone)
 	})
 	retryBtn.Importance = widget.HighImportance
 
-	cancelBtn := widget.NewButton("取消", func() {
-		logger.Info("用户取消写回")
+	cancelBtn := widget.NewButton("强制关闭", func() {
+		logger.Info("用户选择不写回直接关闭")
+		d.Hide()
+		onDone()
 	})
 
 	btns := container.NewHBox(
@@ -201,8 +206,7 @@ func (a *App) showBusyFilesRetryDialog(onDone func()) {
 		btns,
 	)
 
-	d := dialog.NewCustom("文件占用", "", content, a.window)
-	d.SetOnClosed(nil)
-	d.Resize(fyne.NewSize(400, 200))
+	d = dialog.NewCustom("文件占用", "", content, a.window)
+	d.Resize(fyne.NewSize(450, 200))
 	d.Show()
 }

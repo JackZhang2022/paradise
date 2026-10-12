@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"paradise/internal/logger"
 )
@@ -70,8 +69,7 @@ func hasFileOpen(pid int, path string) bool {
 		if err != nil {
 			continue
 		}
-		// 检查 fd 链接是否指向目标文件，或目标文件路径的任意前缀
-		if link == path || strings.HasPrefix(path, link+string(os.PathSeparator)) || strings.HasPrefix(link, path+string(os.PathSeparator)) {
+		if link == path {
 			return true
 		}
 	}
