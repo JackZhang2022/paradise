@@ -14,7 +14,7 @@ import (
 )
 
 func showBackupDialog(w fyne.Window, vaultDir string, statusLabel *widget.Label) {
-	dstLabel, dstBtn := folderPickerRow(w)
+	dstLabel, dstBtn := folderPickerRow(w, executableDir())
 
 	vaultInfo := widget.NewLabelWithStyle("备份源: "+vaultDir, fyne.TextAlignLeading, fyne.TextStyle{Italic: true})
 

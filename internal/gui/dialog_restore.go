@@ -76,7 +76,7 @@ func showRestoreDialog(w fyne.Window, statusLabel *widget.Label) {
 	}
 
 	// 目标目录
-	targetLabel, targetBtn := folderPickerRow(w)
+	targetLabel, targetBtn := folderPickerRow(w, executableDir())
 
 	var d dialog.Dialog
 
