@@ -50,10 +50,12 @@ func (a *App) showDashboard() {
 
 	lockBtn := widget.NewButtonWithIcon("锁定", theme.CancelIcon(), func() {
 		logger.Info("用户锁定应用")
-		a.password = ""
-		a.key = nil
-		a.salt = nil
-		a.showLogin()
+		a.tryAutoWriteback(func() {
+			a.password = ""
+			a.key = nil
+			a.salt = nil
+			a.showLogin()
+		})
 	})
 	lockBtn.Importance = widget.DangerImportance
 
