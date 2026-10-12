@@ -60,7 +60,7 @@ func (a *App) showLogin() {
 		a.vaultDir = resolvedVault
 
 		logger.Info("登录成功", "vault_dir", a.vaultDir)
-		a.showDashboard()
+		a.startupCleanup()
 	})
 	loginBtn.Importance = widget.HighImportance
 
