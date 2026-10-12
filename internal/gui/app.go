@@ -20,8 +20,6 @@ package gui
 
 import (
 	"errors"
-	"fmt"
-	"strings"
 
 	"paradise/internal/config"
 	"paradise/internal/crypto"
@@ -142,15 +140,15 @@ func (a *App) tryAutoWriteback(onDone func()) {
 	logger.Info("自动写回解密目录", "records", len(records))
 
 	// 先检查是否有文件被其他进程占用
-	var busyFiles []string
+	hasBusy := false
 	for _, rec := range records {
-		files := vault.CheckFilesInUse(rec.DecryptedDir)
-		for _, f := range files {
-			busyFiles = append(busyFiles, f)
+		if len(vault.CheckFilesInUse(rec.DecryptedDir)) > 0 {
+			hasBusy = true
+			break
 		}
 	}
-	if len(busyFiles) > 0 {
-		a.showBusyFilesRetryDialog(busyFiles, onDone)
+	if hasBusy {
+		a.showBusyFilesRetryDialog(onDone)
 		return
 	}
 
@@ -177,17 +175,8 @@ func (a *App) doWriteback(records []vault.DecryptRecord, onDone func()) {
 }
 
 // showBusyFilesRetryDialog 文件被占用时显示重试对话框
-func (a *App) showBusyFilesRetryDialog(files []string, onDone func()) {
-	var msgLines []string
-	msgLines = append(msgLines, "以下文件正在被其他程序占用，无法执行写回：")
-	msgLines = append(msgLines, "")
-	for _, f := range files {
-		msgLines = append(msgLines, fmt.Sprintf("• %s", f))
-	}
-	msgLines = append(msgLines, "")
-	msgLines = append(msgLines, "请关闭占用文件的程序后点击「重试」。")
-
-	msgLabel := widget.NewLabel(strings.Join(msgLines, "\n"))
+func (a *App) showBusyFilesRetryDialog(onDone func()) {
+	msgLabel := widget.NewLabel("解密目录中有文件正在被其他程序占用，无法执行写回。\n请关闭占用文件的程序后点击「重试」。")
 	msgLabel.Wrapping = fyne.TextWrapWord
 
 	retryBtn := widget.NewButtonWithIcon("重试", theme.ViewRefreshIcon(), func() {
@@ -196,14 +185,24 @@ func (a *App) showBusyFilesRetryDialog(files []string, onDone func()) {
 	})
 	retryBtn.Importance = widget.HighImportance
 
-	content := container.NewVBox(
-		widget.NewLabelWithStyle("⚠ 文件被占用", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
-		msgLabel,
+	cancelBtn := widget.NewButton("取消", func() {
+		logger.Info("用户取消写回")
+	})
+
+	btns := container.NewHBox(
+		cancelBtn,
+		widget.NewLabel(""), // spacer
 		retryBtn,
 	)
 
-	d := dialog.NewCustom("文件占用", "跳过", content, a.window)
-	d.SetOnClosed(onDone)
-	d.Resize(fyne.NewSize(500, 300))
+	content := container.NewVBox(
+		widget.NewLabelWithStyle("⚠ 文件被占用", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
+		msgLabel,
+		btns,
+	)
+
+	d := dialog.NewCustom("文件占用", "", content, a.window)
+	d.SetOnClosed(nil)
+	d.Resize(fyne.NewSize(400, 200))
 	d.Show()
 }
