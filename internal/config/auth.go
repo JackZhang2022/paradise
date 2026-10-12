@@ -150,3 +150,30 @@ func EncodeSalt(salt []byte) string {
 func DecodeSalt(s string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(s)
 }
+
+// AutoSetupTest 测试模式下自动初始化：设置测试密码、生成盐值、使用默认保险库目录
+func AutoSetupTest() error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(TestPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("密码哈希失败: %w", err)
+	}
+
+	salt, err := GenerateSalt()
+	if err != nil {
+		return err
+	}
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		cfg = &AppConfig{}
+	}
+	cfg.PasswordHash = string(hash)
+	cfg.Salt = EncodeSalt(salt)
+	cfg.VaultDir = DefaultVaultDir
+
+	if err := SaveConfig(cfg); err != nil {
+		return err
+	}
+	logger.Info("测试模式：自动初始化完成", "password", TestPassword, "vault", DefaultVaultDir)
+	return nil
+}

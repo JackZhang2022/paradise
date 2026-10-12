@@ -12,6 +12,7 @@ const (
 	dataDirName     = ".paradise"
 	configFileName  = "paradise_config.json"
 	DefaultVaultDir = "vault"
+	TestPassword    = "test" // 测试模式默认密码
 )
 
 // AppConfig 应用配置
@@ -97,4 +98,12 @@ func ResolveVaultDir(vaultDir string) (string, error) {
 		return "", fmt.Errorf("无法获取可执行文件路径: %w", err)
 	}
 	return filepath.Join(filepath.Dir(execPath), vaultDir), nil
+}
+
+// testMode 由构建时 ldflags 注入，debug 版本为 "true"，release 版本为空
+var testMode string
+
+// IsTestMode 检查是否启用测试模式（debug 构建自动启用）
+func IsTestMode() bool {
+	return testMode == "true"
 }

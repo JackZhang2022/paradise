@@ -21,9 +21,12 @@ package gui
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"paradise/internal/config"
+	"paradise/internal/crypto"
 	"paradise/internal/logger"
 	"paradise/internal/vault"
 
@@ -56,7 +59,22 @@ func Run() {
 	a.window.Resize(fyne.NewSize(560, 540))
 	a.setupCloseGuard()
 
-	if config.IsFirstRun() {
+	// 测试模式：自动初始化并登录，跳过设置/登录界面
+	if config.IsTestMode() {
+		logger.Info("测试模式已启用")
+		if config.IsFirstRun() {
+			if err := config.AutoSetupTest(); err != nil {
+				logger.Error("测试模式自动初始化失败", "error", err)
+			}
+		}
+		if err := a.autoLogin(config.TestPassword); err != nil {
+			logger.Error("测试模式自动登录失败", "error", err)
+			a.showLogin()
+		} else {
+			a.ensureTestData()
+			a.showDashboard()
+		}
+	} else if config.IsFirstRun() {
 		logger.Info("首次运行，显示设置界面")
 		a.showSetup()
 	} else {
@@ -65,6 +83,63 @@ func Run() {
 	}
 
 	a.window.ShowAndRun()
+}
+
+// autoLogin 用指定密码自动登录，设置 App 的密钥和保险库目录
+func (a *App) autoLogin(password string) error {
+	if err := config.VerifyPassword(password); err != nil {
+		return err
+	}
+
+	salt, err := config.LoadSalt()
+	if err != nil {
+		return err
+	}
+
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return err
+	}
+
+	a.password = password
+	a.salt = salt
+	a.key = crypto.DeriveKey(password, salt)
+	a.vaultDir = cfg.VaultDir
+	if a.vaultDir == "" {
+		a.vaultDir = config.DefaultVaultDir
+	}
+
+	resolvedVault, err := config.ResolveVaultDir(a.vaultDir)
+	if err != nil {
+		return err
+	}
+	a.vaultDir = resolvedVault
+
+	logger.Info("自动登录成功", "vault_dir", a.vaultDir)
+	return nil
+}
+
+// ensureTestData 测试模式下若保险库为空，预置一个加密测试目录
+func (a *App) ensureTestData() {
+	entries, err := os.ReadDir(a.vaultDir)
+	if err != nil || len(entries) > 0 {
+		return
+	}
+
+	logger.Info("测试模式：保险库为空，预置测试数据")
+
+	testDir := filepath.Join(os.TempDir(), "paradise-test-data")
+	os.RemoveAll(testDir)
+	os.MkdirAll(filepath.Join(testDir, "subdir"), 0700)
+
+	os.WriteFile(filepath.Join(testDir, "机密文件.txt"), []byte("这是测试机密文件内容。\n测试第二行。\n"), 0600)
+	os.WriteFile(filepath.Join(testDir, "subdir", "notes.md"), []byte("# 测试笔记\n\n- 条目1\n- 条目2\n"), 0600)
+
+	if err := vault.EncryptDirectory(testDir, a.vaultDir, a.key); err != nil {
+		logger.Error("测试模式：预置测试数据失败", "error", err)
+		return
+	}
+	logger.Info("测试模式：预置测试数据完成", "vault", a.vaultDir)
 }
 
 // setupCloseGuard 设置窗口关闭拦截：关闭前自动写回所有已解密目录
