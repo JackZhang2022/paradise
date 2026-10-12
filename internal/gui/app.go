@@ -21,7 +21,6 @@ package gui
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"paradise/internal/config"
@@ -70,7 +69,6 @@ func Run() {
 			logger.Error("测试模式自动登录失败", "error", err)
 			a.showLogin()
 		} else {
-			a.ensureTestData()
 			a.showDashboard()
 		}
 	} else if config.IsFirstRun() {
@@ -116,27 +114,6 @@ func (a *App) autoLogin(password string) error {
 
 	logger.Info("自动登录成功", "vault_dir", a.vaultDir)
 	return nil
-}
-
-// ensureTestData 测试模式下若保险库为空，将 test 目录加密存入保险库
-func (a *App) ensureTestData() {
-	entries, err := os.ReadDir(a.vaultDir)
-	if err != nil || len(entries) > 0 {
-		return
-	}
-
-	testDir := "test"
-
-	if info, err := os.Stat(testDir); err != nil || !info.IsDir() {
-		return
-	}
-
-	logger.Info("测试模式：预置测试数据", "source", testDir)
-	if err := vault.EncryptDirectory(testDir, a.vaultDir, a.key); err != nil {
-		logger.Error("测试模式：预置测试数据失败", "error", err)
-		return
-	}
-	logger.Info("测试模式：预置测试数据完成", "vault", a.vaultDir)
 }
 
 // setupCloseGuard 设置窗口关闭拦截：关闭前自动写回所有已解密目录
