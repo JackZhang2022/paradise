@@ -21,7 +21,6 @@ package gui
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"paradise/internal/config"
@@ -70,7 +69,7 @@ func Run() {
 			logger.Error("测试模式自动登录失败", "error", err)
 			a.showLogin()
 		} else {
-			a.startupCleanup()
+			a.showDashboard()
 		}
 	} else if config.IsFirstRun() {
 		logger.Info("首次运行，显示设置界面")
@@ -115,69 +114,6 @@ func (a *App) autoLogin(password string) error {
 
 	logger.Info("自动登录成功", "vault_dir", a.vaultDir)
 	return nil
-}
-
-// startupCleanup 启动时检查并直接删除上次残留的解密目录
-func (a *App) startupCleanup() {
-	logger.Info("启动时检查残留解密目录")
-	records, err := vault.GetAllRecords(a.key)
-	if err != nil || len(records) == 0 {
-		a.showDashboard()
-		return
-	}
-
-	logger.Info("发现残留解密目录，直接删除", "records", len(records))
-
-	var failedDirs []string
-	for _, rec := range records {
-		if err := os.RemoveAll(rec.DecryptedDir); err != nil {
-			logger.Warn("删除残留解密目录失败", "dir", rec.DecryptedDir, "error", err)
-			failedDirs = append(failedDirs, rec.DecryptedDir)
-			continue
-		}
-		_ = vault.RemoveRecord(rec.SourceDir, a.key)
-		logger.Info("已删除残留解密目录", "dir", rec.DecryptedDir)
-	}
-
-	if len(failedDirs) == 0 {
-		logger.Info("残留解密目录清理完成")
-		a.showDashboard()
-		return
-	}
-
-	a.showStartupCleanupRetryDialog(failedDirs)
-}
-
-// showStartupCleanupRetryDialog 启动清理失败时显示重试对话框
-func (a *App) showStartupCleanupRetryDialog(failedDirs []string) {
-	var msgLines []string
-	msgLines = append(msgLines, "以下残留解密目录无法自动删除：")
-	msgLines = append(msgLines, "")
-	for _, d := range failedDirs {
-		msgLines = append(msgLines, fmt.Sprintf("• %s", d))
-	}
-	msgLines = append(msgLines, "")
-	msgLines = append(msgLines, "请关闭占用这些目录的程序后点击「重试」。")
-
-	msgLabel := widget.NewLabel(strings.Join(msgLines, "\n"))
-	msgLabel.Wrapping = fyne.TextWrapWord
-
-	retryBtn := widget.NewButtonWithIcon("重试", theme.ViewRefreshIcon(), func() {
-		logger.Info("用户选择重试清理残留目录")
-		a.startupCleanup()
-	})
-	retryBtn.Importance = widget.HighImportance
-
-	content := container.NewVBox(
-		widget.NewLabelWithStyle("⚠ 残留目录清理失败", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
-		msgLabel,
-		retryBtn,
-	)
-
-	d := dialog.NewCustom("启动清理", "跳过", content, a.window)
-	d.SetOnClosed(a.showDashboard)
-	d.Resize(fyne.NewSize(500, 280))
-	d.Show()
 }
 
 // setupCloseGuard 设置窗口关闭拦截：关闭前自动写回所有已解密目录
