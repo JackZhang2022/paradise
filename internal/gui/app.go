@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"paradise/internal/config"
@@ -119,22 +118,20 @@ func (a *App) autoLogin(password string) error {
 	return nil
 }
 
-// ensureTestData 测试模式下若保险库为空，预置一个加密测试目录
+// ensureTestData 测试模式下若保险库为空，将 test 目录加密存入保险库
 func (a *App) ensureTestData() {
 	entries, err := os.ReadDir(a.vaultDir)
 	if err != nil || len(entries) > 0 {
 		return
 	}
 
-	logger.Info("测试模式：保险库为空，预置测试数据")
+	testDir := "test"
 
-	testDir := filepath.Join(os.TempDir(), "paradise-test-data")
-	os.RemoveAll(testDir)
-	os.MkdirAll(filepath.Join(testDir, "subdir"), 0700)
+	if info, err := os.Stat(testDir); err != nil || !info.IsDir() {
+		return
+	}
 
-	os.WriteFile(filepath.Join(testDir, "机密文件.txt"), []byte("这是测试机密文件内容。\n测试第二行。\n"), 0600)
-	os.WriteFile(filepath.Join(testDir, "subdir", "notes.md"), []byte("# 测试笔记\n\n- 条目1\n- 条目2\n"), 0600)
-
+	logger.Info("测试模式：预置测试数据", "source", testDir)
 	if err := vault.EncryptDirectory(testDir, a.vaultDir, a.key); err != nil {
 		logger.Error("测试模式：预置测试数据失败", "error", err)
 		return
