@@ -138,21 +138,7 @@ func (a *App) tryAutoWriteback(onDone func()) {
 	}
 
 	logger.Info("自动写回解密目录", "records", len(records))
-
-	// 先检查是否有文件被其他进程占用
-	hasBusy := false
-	for _, rec := range records {
-		if len(vault.CheckFilesInUse(rec.DecryptedDir)) > 0 {
-			hasBusy = true
-			break
-		}
-	}
-	if hasBusy {
-		a.showBusyFilesRetryDialog(onDone)
-		return
-	}
-
-	a.doWriteback(records, onDone)
+	a.showWritebackConfirmDialog(records, onDone)
 }
 
 // doWriteback 执行实际写回操作
@@ -174,39 +160,49 @@ func (a *App) doWriteback(records []vault.DecryptRecord, onDone func()) {
 	onDone()
 }
 
-// showBusyFilesRetryDialog 文件被占用时显示重试对话框
-func (a *App) showBusyFilesRetryDialog(onDone func()) {
-	msgLabel := widget.NewLabel("解密目录中有文件正在被其他程序占用，无法执行写回。\n请关闭占用文件的程序后点击「重试」。")
+// showWritebackConfirmDialog 关闭前确认写回对话框
+func (a *App) showWritebackConfirmDialog(records []vault.DecryptRecord, onDone func()) {
+	msgLabel := widget.NewLabel("关闭前将自动写回并删除以下解密目录：\n\n请确保其中的文件已全部保存，否则修改将会丢失。")
 	msgLabel.Wrapping = fyne.TextWrapWord
+
+	dirList := widget.NewList(
+		func() int { return len(records) },
+		func() fyne.CanvasObject {
+			return widget.NewLabel("")
+		},
+		func(id widget.ListItemID, obj fyne.CanvasObject) {
+			obj.(*widget.Label).SetText(records[id].DecryptedDir)
+		},
+	)
 
 	var d dialog.Dialog
 
-	retryBtn := widget.NewButtonWithIcon("重试", theme.ViewRefreshIcon(), func() {
-		logger.Info("用户选择重试写回")
+	confirmBtn := widget.NewButtonWithIcon("确认写回", theme.ConfirmIcon(), func() {
+		logger.Info("用户确认自动写回")
 		d.Hide()
-		a.tryAutoWriteback(onDone)
+		a.doWriteback(records, onDone)
 	})
-	retryBtn.Importance = widget.HighImportance
+	confirmBtn.Importance = widget.HighImportance
 
-	cancelBtn := widget.NewButton("强制关闭", func() {
-		logger.Info("用户选择不写回直接关闭")
+	cancelBtn := widget.NewButton("取消", func() {
+		logger.Info("用户取消自动写回")
 		d.Hide()
-		onDone()
 	})
 
 	btns := container.NewHBox(
 		cancelBtn,
-		widget.NewLabel(""), // spacer
-		retryBtn,
+		widget.NewLabel(""),
+		confirmBtn,
 	)
 
 	content := container.NewVBox(
-		widget.NewLabelWithStyle("⚠ 文件被占用", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
+		widget.NewLabelWithStyle("确认写回并清理", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
 		msgLabel,
+		dirList,
 		btns,
 	)
 
-	d = dialog.NewCustom("文件占用", "", content, a.window)
-	d.Resize(fyne.NewSize(450, 200))
+	d = dialog.NewCustom("关闭确认", "", content, a.window)
+	d.Resize(fyne.NewSize(480, 320))
 	d.Show()
 }
