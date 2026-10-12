@@ -141,6 +141,24 @@ func (a *App) tryAutoWriteback(onDone func()) {
 
 	logger.Info("自动写回解密目录", "records", len(records))
 
+	// 先检查是否有文件被其他进程占用
+	var busyFiles []string
+	for _, rec := range records {
+		files := vault.CheckFilesInUse(rec.DecryptedDir)
+		for _, f := range files {
+			busyFiles = append(busyFiles, f)
+		}
+	}
+	if len(busyFiles) > 0 {
+		a.showBusyFilesRetryDialog(busyFiles, onDone)
+		return
+	}
+
+	a.doWriteback(records, onDone)
+}
+
+// doWriteback 执行实际写回操作
+func (a *App) doWriteback(records []vault.DecryptRecord, onDone func()) {
 	var failedDirs []string
 	var failedErrors []string
 
@@ -166,6 +184,38 @@ func (a *App) tryAutoWriteback(onDone func()) {
 	}
 
 	a.showWritebackRetryDialog(failedDirs, failedErrors, onDone)
+}
+
+// showBusyFilesRetryDialog 文件被占用时显示重试对话框
+func (a *App) showBusyFilesRetryDialog(files []string, onDone func()) {
+	var msgLines []string
+	msgLines = append(msgLines, "以下文件正在被其他程序占用，无法执行写回：")
+	msgLines = append(msgLines, "")
+	for _, f := range files {
+		msgLines = append(msgLines, fmt.Sprintf("• %s", f))
+	}
+	msgLines = append(msgLines, "")
+	msgLines = append(msgLines, "请关闭占用文件的程序后点击「重试」。")
+
+	msgLabel := widget.NewLabel(strings.Join(msgLines, "\n"))
+	msgLabel.Wrapping = fyne.TextWrapWord
+
+	retryBtn := widget.NewButtonWithIcon("重试", theme.ViewRefreshIcon(), func() {
+		logger.Info("用户选择重试写回")
+		a.tryAutoWriteback(onDone)
+	})
+	retryBtn.Importance = widget.HighImportance
+
+	content := container.NewVBox(
+		widget.NewLabelWithStyle("⚠ 文件被占用", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
+		msgLabel,
+		retryBtn,
+	)
+
+	d := dialog.NewCustom("文件占用", "跳过", content, a.window)
+	d.SetOnClosed(onDone)
+	d.Resize(fyne.NewSize(500, 300))
+	d.Show()
 }
 
 // showWritebackRetryDialog 显示写回失败的重试对话框，onDone 是清理完成后的回调
