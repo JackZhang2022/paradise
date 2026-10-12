@@ -57,6 +57,12 @@ func ReEncryptAndClean(sourceDir, decryptedDir string, key []byte) error {
 			continue
 		}
 
+		// 在删除任何数据前，先检查解密子目录中是否有文件被其他进程占用
+		if busy := CheckFilesInUse(decSubDir); len(busy) > 0 {
+			logger.Warn("解密子目录中有文件被占用，跳过写回", "subdir", origName, "busy_count", len(busy))
+			continue
+		}
+
 		// 删除旧的加密子目录
 		if err := os.RemoveAll(encSubDir); err != nil {
 			logger.Error("删除旧加密子目录失败", "dir", encSubDir, "error", err)
