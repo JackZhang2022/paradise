@@ -159,9 +159,6 @@ func (a *App) tryAutoWriteback(onDone func()) {
 
 // doWriteback 执行实际写回操作
 func (a *App) doWriteback(records []vault.DecryptRecord, onDone func()) {
-	var failedDirs []string
-	var failedErrors []string
-
 	for _, rec := range records {
 		logger.Info("自动写回", "source", rec.SourceDir, "decrypted", rec.DecryptedDir)
 		err := vault.ReEncryptAndClean(rec.SourceDir, rec.DecryptedDir, a.key)
@@ -172,18 +169,11 @@ func (a *App) doWriteback(records []vault.DecryptRecord, onDone func()) {
 				continue
 			}
 			logger.Warn("自动写回失败", "decrypted", rec.DecryptedDir, "error", err)
-			failedDirs = append(failedDirs, rec.DecryptedDir)
-			failedErrors = append(failedErrors, err.Error())
 		}
 	}
 
-	if len(failedDirs) == 0 {
-		logger.Info("所有解密目录已自动写回")
-		onDone()
-		return
-	}
-
-	a.showWritebackRetryDialog(failedDirs, failedErrors, onDone)
+	logger.Info("所有解密目录已自动写回")
+	onDone()
 }
 
 // showBusyFilesRetryDialog 文件被占用时显示重试对话框
@@ -213,41 +203,6 @@ func (a *App) showBusyFilesRetryDialog(files []string, onDone func()) {
 	)
 
 	d := dialog.NewCustom("文件占用", "跳过", content, a.window)
-	d.SetOnClosed(onDone)
-	d.Resize(fyne.NewSize(500, 300))
-	d.Show()
-}
-
-// showWritebackRetryDialog 显示写回失败的重试对话框，onDone 是清理完成后的回调
-func (a *App) showWritebackRetryDialog(failedDirs []string, failedErrors []string, onDone func()) {
-	var msgLines []string
-	msgLines = append(msgLines, "以下解密目录写回后无法自动删除：")
-	msgLines = append(msgLines, "")
-	for i, d := range failedDirs {
-		msgLines = append(msgLines, fmt.Sprintf("• %s", d))
-		if i < len(failedErrors) && failedErrors[i] != "" {
-			msgLines = append(msgLines, fmt.Sprintf("  原因: %s", failedErrors[i]))
-		}
-	}
-	msgLines = append(msgLines, "")
-	msgLines = append(msgLines, "请关闭占用这些目录的程序后点击「重试」。")
-
-	msgLabel := widget.NewLabel(strings.Join(msgLines, "\n"))
-	msgLabel.Wrapping = fyne.TextWrapWord
-
-	retryBtn := widget.NewButtonWithIcon("重试", theme.ViewRefreshIcon(), func() {
-		logger.Info("用户选择重试自动写回")
-		a.tryAutoWriteback(onDone)
-	})
-	retryBtn.Importance = widget.HighImportance
-
-	content := container.NewVBox(
-		widget.NewLabelWithStyle("⚠ 自动写回部分失败", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
-		msgLabel,
-		retryBtn,
-	)
-
-	d := dialog.NewCustom("自动清理", "跳过", content, a.window)
 	d.SetOnClosed(onDone)
 	d.Resize(fyne.NewSize(500, 300))
 	d.Show()
