@@ -14,31 +14,51 @@ package gui
 
 import (
 	"errors"
+	"os"
 	"os/exec"
 	"paradise/internal/logger"
 	"paradise/internal/vault"
+	"path/filepath"
 	"runtime"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/widget"
 )
 
 // folderPickerRow 创建一行：标签 + 路径显示 + 浏览按钮
-func folderPickerRow(w fyne.Window) (*widget.Label, *widget.Button) {
+// startDir 是文件选择器的初始目录
+func folderPickerRow(w fyne.Window, startDir string) (*widget.Label, *widget.Button) {
 	pathLabel := widget.NewLabel("(未选择)")
 	pathLabel.Truncation = fyne.TextTruncateClip
 
 	browseBtn := widget.NewButton("浏览", func() {
-		dialog.ShowFolderOpen(func(uri fyne.ListableURI, err error) {
+		d := dialog.NewFolderOpen(func(uri fyne.ListableURI, err error) {
 			if err != nil || uri == nil {
 				return
 			}
 			pathLabel.SetText(uri.Path())
 		}, w)
+		if startDir != "" {
+			if u, err := storage.ListerForURI(storage.NewFileURI(startDir)); err == nil {
+				d.SetLocation(u)
+			}
+		}
+		d.Resize(fyne.NewSize(600, 400))
+		d.Show()
 	})
 
 	return pathLabel, browseBtn
+}
+
+// executableDir 返回可执行文件所在目录
+func executableDir() string {
+	execPath, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	return filepath.Dir(execPath)
 }
 
 // openDirectory 在系统文件管理器中打开指定目录

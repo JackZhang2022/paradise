@@ -17,11 +17,14 @@ import (
 )
 
 func showDecryptDialog(w fyne.Window, key []byte, salt []byte, vaultDir string, statusLabel *widget.Label) {
-	dstLabel, dstBtn := folderPickerRow(w)
-
-	// 恢复上次解密的目标目录
+	defaultDir := executableDir()
 	if lastDir := vault.GetLastDecryptDir(key); lastDir != "" {
-		dstLabel.SetText(lastDir)
+		defaultDir = lastDir
+	}
+	dstLabel, dstBtn := folderPickerRow(w, defaultDir)
+
+	if vault.GetLastDecryptDir(key) != "" {
+		dstLabel.SetText(vault.GetLastDecryptDir(key))
 	}
 
 	// 源固定为保险库目录

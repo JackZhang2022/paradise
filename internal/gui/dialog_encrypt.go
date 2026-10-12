@@ -13,11 +13,14 @@ import (
 )
 
 func showEncryptDialog(w fyne.Window, key []byte, vaultDir string, statusLabel *widget.Label) {
-	srcLabel, srcBtn := folderPickerRow(w)
-
-	// 恢复上次加密的源目录
+	defaultDir := executableDir()
 	if lastDir := vault.GetLastEncryptDir(key); lastDir != "" {
-		srcLabel.SetText(lastDir)
+		defaultDir = lastDir
+	}
+	srcLabel, srcBtn := folderPickerRow(w, defaultDir)
+
+	if vault.GetLastEncryptDir(key) != "" {
+		srcLabel.SetText(vault.GetLastEncryptDir(key))
 	}
 
 	// 目标固定为保险库目录
